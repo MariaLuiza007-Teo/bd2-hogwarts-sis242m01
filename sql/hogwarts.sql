@@ -280,26 +280,42 @@ SELECT preco FROM produto WHERE nome_produto = 'Sapo de Chocolate';
 -- 3. REMOÇÃO DE DADOS (DELETE) E TESTES DE RESTRIÇÕES
 -- =====================================================================
 -- Questão 13
--- Erro:
--- Explicação:
+-- DELETE FROM casa WHERE nome_casa = 'Sonserina';
+-- Erro: Error Code: 1451. Cannot delete or update a parent row: a foreign key constraint fails
+-- Explicação: a Sonserina é referenciada por alunos e pelo professor Snape (chave estrangeira id_casa),
+-- então o banco não deixa apagá-la enquanto houver registros ligados a ela.
 
 -- Questão 14
--- Erro:
--- Explicação:
+-- INSERT INTO aluno (nome, ano_escolar, id_casa) VALUES ('Dobby', 8, 1);
+-- Erro: Error Code: 3819. Check constraint 'aluno_chk_1' is violated.
+-- Explicação: o CHECK da tabela aluno só aceita ano_escolar de 1 a 7, e o Dobby foi cadastrado no 8º ano.
 
 -- Questão 15
--- Erro:
--- Explicação:
+-- INSERT INTO aluno (nome, ano_escolar, id_casa, email) VALUES ('Harry Potter (Polissuco)', 5, 1, 'harry.potter@hogwarts.edu');
+-- Erro: Error Code: 1062. Duplicate entry 'harry.potter@hogwarts.edu' for key 'aluno.uq_aluno_email'
+-- Explicação: o e-mail já pertence ao Harry Potter, e a restrição UNIQUE uq_aluno_email não permite repetir.
 
 -- Questão 16
--- Erro:
--- Explicação:
+-- DELETE FROM professor WHERE nome = 'Severo Snape';
+-- Erro: Error Code: 1451. Cannot delete or update a parent row: a foreign key constraint fails
+-- Explicação: o Snape é o professor de Poções, e a tabela disciplina referencia ele pela chave estrangeira id_prof.
 
 -- Questão 17
+DELETE FROM professor WHERE nome = 'Gilderoy Lockhart';
+-- Por que funciona: nenhuma tabela referencia o Lockhart (ele não ministra disciplina), então não há chave estrangeira impedindo.
 
 -- Questão 18
+DELETE FROM matricula WHERE id_aluno IN (SELECT id_aluno FROM aluno WHERE nome = 'Vicente Crabbe');
+DELETE FROM aluno WHERE nome = 'Vicente Crabbe';
 
 -- Questão 19
+DELETE FROM disciplina WHERE id_disc NOT IN (SELECT id_disc FROM matricula);
+
+-- Confira
+SELECT COUNT(*) FROM professor;
+SELECT COUNT(*) FROM aluno;
+SELECT COUNT(*) FROM disciplina;
+SELECT COUNT(*) FROM matricula;
 
 
 -- =====================================================================
