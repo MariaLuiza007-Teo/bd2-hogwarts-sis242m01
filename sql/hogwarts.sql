@@ -709,25 +709,63 @@ SELECT * FROM vw_placar_casas;
 -- 8. CONTROLE DE ACESSO (DCL)
 -- =====================================================================
 -- Questão 39
+-- Limpeza: garante que o script rode do zero mesmo se os usuários ficaram de uma execução anterior
+DROP USER IF EXISTS 'filch'@'localhost', 'mcgonagall'@'localhost', 'dumbledore'@'localhost', 'percy'@'localhost';
+DROP ROLE IF EXISTS 'monitor';
+
+CREATE USER 'filch'@'localhost' IDENTIFIED BY 'MadameNorra#1';
+CREATE USER 'mcgonagall'@'localhost' IDENTIFIED BY 'Animago#Gato1';
+CREATE USER 'dumbledore'@'localhost' IDENTIFIED BY 'Fenix#Fawkes1';
 
 -- Questão 40
+GRANT SELECT ON hogwarts.vw_placar_casas TO 'filch'@'localhost';
 
 -- Questão 41
+GRANT SELECT, INSERT ON hogwarts.registro_pontos TO 'mcgonagall'@'localhost';
+GRANT SELECT ON hogwarts.aluno TO 'mcgonagall'@'localhost';
+GRANT SELECT ON hogwarts.vw_boletim TO 'mcgonagall'@'localhost';
 
 -- Questão 42
+GRANT ALL PRIVILEGES ON hogwarts.* TO 'dumbledore'@'localhost' WITH GRANT OPTION;
 
 -- Questão 43
+SHOW GRANTS FOR 'filch'@'localhost';
+SHOW GRANTS FOR 'mcgonagall'@'localhost';
 
--- Questão 44
--- Resultado de cada comando:
+-- Questão 44 (executar em uma conexão aberta com o usuário filch)
+-- SELECT * FROM hogwarts.vw_placar_casas;
+-- SELECT * FROM hogwarts.aluno;
+-- Resultado de cada comando: a consulta à view vw_placar_casas funcionou e mostrou o placar, porque o filch tem SELECT nela. O SELECT * FROM aluno foi negado:
+-- Error Code: 1142. SELECT command denied to user 'filch'@'localhost' for table 'aluno'
 
--- Questão 45
--- Como o trigger conseguiu atualizar a casa:
+-- Questão 45 (executar em uma conexão aberta com o usuário mcgonagall)
+-- INSERT INTO hogwarts.registro_pontos (id_aluno, id_prof, pontos, motivo, data_registro)
+-- VALUES (2, 1, 10, 'Ajudou um colega em Transfiguração', '2026-11-10');
+-- UPDATE hogwarts.casa SET pontos = 1000 WHERE id_casa = 1;
+-- Resultado: o INSERT funcionou e a Grifinória ganhou os 10 pontos. O UPDATE foi negado:
+-- Error Code: 1142. UPDATE command denied to user 'mcgonagall'@'localhost' for table 'casa'
+-- Como o trigger conseguiu atualizar a casa: o trigger roda com as permissões do DEFINER (o usuário que criou o trigger), e não com as de quem fez o INSERT. Por isso o
+-- trg_pontos_casa conseguiu atualizar a tabela casa mesmo a McGonagall não tendo UPDATE nela.
 
 -- Questão 46
+REVOKE INSERT ON hogwarts.registro_pontos FROM 'mcgonagall'@'localhost';
+SHOW GRANTS FOR 'mcgonagall'@'localhost';
 
 -- Questão 47
--- Vantagem dos papéis:
+CREATE ROLE 'monitor';
+GRANT SELECT ON hogwarts.vw_boletim TO 'monitor';
+GRANT SELECT ON hogwarts.vw_placar_casas TO 'monitor';
+
+CREATE USER 'percy'@'localhost' IDENTIFIED BY 'Monitor#Chefe1';
+GRANT 'monitor' TO 'percy'@'localhost';
+SET DEFAULT ROLE 'monitor' TO 'percy'@'localhost';
+-- Vantagem dos papéis: as permissões ficam definidas em um lugar só. Para um novo monitor basta
+-- atribuir o papel, e qualquer mudança no papel vale para todos os monitores de uma vez, sem precisar dar ou tirar GRANT de cada usuário individualmente.
 
 -- Questão 48
+DROP USER 'filch'@'localhost';
+DROP USER 'mcgonagall'@'localhost';
+DROP USER 'dumbledore'@'localhost';
+DROP USER 'percy'@'localhost';
+DROP ROLE 'monitor';
 
