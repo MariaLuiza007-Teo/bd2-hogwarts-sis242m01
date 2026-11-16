@@ -327,9 +327,7 @@ CREATE TRIGGER trg_pontos_casa
 AFTER INSERT ON registro_pontos
 FOR EACH ROW
 BEGIN
-    UPDATE casa
-    SET pontos = pontos + NEW.pontos
-    WHERE id_casa = (SELECT id_casa FROM aluno WHERE id_aluno = NEW.id_aluno);
+    UPDATE casa SET pontos = pontos + NEW.pontos WHERE id_casa = (SELECT id_casa FROM aluno WHERE id_aluno = NEW.id_aluno);
 END$$
 DELIMITER ;
 
@@ -343,13 +341,9 @@ BEGIN
     DECLARE v_preco   DECIMAL(10,2);
     DECLARE v_saldo   DECIMAL(10,2);
 
-    SELECT estoque, preco INTO v_estoque, v_preco
-    FROM produto
-    WHERE id_produto = NEW.id_produto;
+    SELECT estoque, preco INTO v_estoque, v_preco FROM produto WHERE id_produto = NEW.id_produto;
 
-    SELECT saldo_galeoes INTO v_saldo
-    FROM aluno
-    WHERE id_aluno = NEW.id_aluno;
+    SELECT saldo_galeoes INTO v_saldo FROM aluno WHERE id_aluno = NEW.id_aluno;
 
     IF v_estoque < NEW.quantidade THEN
         SIGNAL SQLSTATE '45000'
@@ -369,13 +363,8 @@ CREATE TRIGGER trg_baixa_compra
 AFTER INSERT ON compra
 FOR EACH ROW
 BEGIN
-    UPDATE produto
-    SET estoque = estoque - NEW.quantidade
-    WHERE id_produto = NEW.id_produto;
-
-    UPDATE aluno
-    SET saldo_galeoes = saldo_galeoes - NEW.valor_total
-    WHERE id_aluno = NEW.id_aluno;
+    UPDATE produto SET estoque = estoque - NEW.quantidade WHERE id_produto = NEW.id_produto;
+    UPDATE aluno SET saldo_galeoes = saldo_galeoes - NEW.valor_total WHERE id_aluno = NEW.id_aluno;
 END$$
 DELIMITER ;
 
@@ -402,16 +391,13 @@ AFTER UPDATE ON professor
 FOR EACH ROW
 BEGIN
     IF OLD.salario <> NEW.salario THEN
-        INSERT INTO log_auditoria (tabela, operacao, descricao)
-        VALUES ('professor', 'UPDATE',
-                CONCAT(OLD.nome, ': salário de ', OLD.salario, ' para ', NEW.salario));
+        INSERT INTO log_auditoria (tabela, operacao, descricao) VALUES ('professor', 'UPDATE', CONCAT(OLD.nome, ': salário de ', OLD.salario, ' para ', NEW.salario));
     END IF;
 END$$
 DELIMITER ;
 
 -- Pergunta para pensar: por que a validação é BEFORE e a baixa é AFTER?
--- Resposta: a validação precisa ser BEFORE para barrar a compra e calcular o valor_total
--- antes de a linha ser gravada. A baixa precisa ser AFTER para só diminuir o estoque e o saldo
+-- Resposta: a validação precisa ser BEFORE para barrar a compra e calcular o valor_total antes de a linha ser gravada. A baixa precisa ser AFTER para só diminuir o estoque e o saldo
 -- depois que a compra foi gravada de fato (se a compra for bloqueada, nada é descontado).
 
 -- Questão 25 - INSERT registro_pontos
@@ -480,15 +466,55 @@ SELECT COUNT(*) FROM log_auditoria;
 -- 5. CONTROLE DE TRANSAÇÕES (TCL)
 -- =====================================================================
 -- Questão 26
+START TRANSACTION;
+UPDATE aluno SET saldo_galeoes = saldo_galeoes - 50 WHERE nome = 'Draco Malfoy';
+UPDATE aluno SET saldo_galeoes = saldo_galeoes + 50 WHERE nome = 'Pansy Parkinson';
+COMMIT;
+
+SELECT nome, saldo_galeoes FROM aluno WHERE nome IN ('Draco Malfoy', 'Pansy Parkinson');
 
 -- Questão 27
+START TRANSACTION;
+UPDATE casa SET pontos = 0;
+SELECT nome_casa, pontos FROM casa;
+ROLLBACK;
+SELECT nome_casa, pontos FROM casa;
+-- O placar voltou? Sim: o ROLLBACK desfez o UPDATE, e as casas voltaram aos pontos de antes.
 
 -- Questão 28
+START TRANSACTION;
+INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra) VALUES (1, 1, 1, '2026-11-10');
+SELECT saldo_galeoes FROM aluno WHERE id_aluno = 1;
+SELECT estoque FROM produto WHERE id_produto = 1;
+ROLLBACK;
+SELECT saldo_galeoes FROM aluno WHERE id_aluno = 1;
+SELECT estoque FROM produto WHERE id_produto = 1;
+-- O que aconteceu: o ROLLBACK também desfez o que o trigger tinha feito; o saldo do Harry
+-- e o estoque da varinha voltaram aos valores de antes, porque o trigger faz parte da mesma transação.
 
 -- Questão 29
+START TRANSACTION;
+
+INSERT INTO registro_pontos (id_aluno, id_prof, pontos, motivo, data_registro)
+VALUES (12, 4, 15, 'Cuidou das estufas no feriado', '2026-11-10');
+
+SAVEPOINT sp_pontos_legitimos;
+
+INSERT INTO registro_pontos (id_aluno, id_prof, pontos, motivo, data_registro)
+VALUES (6, 2, 100, 'Favoritismo descarado', '2026-11-10');
+
+ROLLBACK TO SAVEPOINT sp_pontos_legitimos;
+
+COMMIT;
+
+-- Confira
+SELECT nome_casa, pontos FROM casa;
+SELECT COUNT(*) FROM registro_pontos;
 
 -- Questão 30
--- Resposta:
+SELECT @@autocommit;
+-- Resposta: o valor 1 significa que o autocommit está ligado, ou seja, cada comando é confirmado
+-- sozinho, sem precisar de COMMIT. Um CREATE TABLE no meio de uma transação aberta faz um COMMIT implícito: tudo o que estava pendente é confirmado e não dá mais para desfazer com ROLLBACK.
 
 
 -- =====================================================================
